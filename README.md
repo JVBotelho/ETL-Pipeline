@@ -40,6 +40,13 @@
 - Find the "csv_data_pipeline_daily" DAG and click the "Toggle DAG" button to enable it
 - Once the DAG is enabled, you can click the "Trigger DAG" button to manually start the DAG. Alternatively, the DAG will run automatically according to the schedule defined in the schedule_interval parameter of the DAG object.
 - Monitor the progress of the DAG in the Airflow UI. You can view the status of individual tasks, check the logs, and see the overall progress of the DAG.
+## Roadmap
+
+- Fully change to the TaskFlow API paradigm
+- Save to the PostgreSQL instead of a new .csv dataset
+- Validate the raw data based in the PostgreSQL table columns
+
+
 ## Autor
 
 - [@Joao Victor Botelho](https://github.com/JVBotelho)
