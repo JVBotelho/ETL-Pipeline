@@ -4,7 +4,6 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 import logging
 import os
-import attr
 
 # Define the path to the raw and processed datasets.
 AIRFLOW_HOME = os.getenv('AIRFLOW_HOME')
@@ -15,9 +14,6 @@ PROCESSED_DATA_PATH = AIRFLOW_HOME + "/dags/processedDataset.csv"
 EXPECTED_COLUMNS = ['uniq_id', 'crawl_timestamp', 'product_url', 'product_name', 'product_category_tree', 'pid',
                     'retail_price', 'discounted_price', 'image', 'is_FK_Advantage_product', 'description',
                     'product_rating', 'overall_rating', 'brand', 'product_specifications']
-
-# Define the global variable to store the retrieved data
-workingData = None
 
 
 def on_failure_callback(context):
@@ -46,7 +42,7 @@ default_args = {
 
 # Create the DAG object.
 dag = DAG(
-    'csv_data_pipeline_daily',
+    'csv_data_pipeline_daily_v2.1.3',
     default_args=default_args,
     description=('A DAG that retrieves data from a CSV dataset, normalizes '
                  'and cleans it, and saves it to another CSV dataset daily.'),
@@ -54,45 +50,64 @@ dag = DAG(
 )
 
 
-# Define the functions to retrieve,normalize, and clean the data.
-@attr.s
-class SerializableDataFrame:
-    data = attr.ib()
-
-def retrieve_data():
-    global workingData
+def retrieve_data(**context):
     try:
-        workingData = pd.read_csv(RAW_DATA_PATH)
+        workingData = pd.read_csv(RAW_DATA_PATH, header=0, encoding='unicode_escape', engine='python')
         logging.info('Data retrieved successfully.')
+        context['ti'].xcom_push(key='working_data', value=workingData.to_json())
     except Exception as e:
         logging.error(f'Error retrieving data: {str(e)}')
         raise e
 
-    return SerializableDataFrame(workingData)
+
+def validate_raw_data(**context):
+    """
+    Check that the raw data contains all expected columns.
+    """
+    ti = context['ti']
+    workingData = pd.read_json(ti.xcom_pull(key='working_data'))
+    missing_columns = set(EXPECTED_COLUMNS) - set(workingData.columns)
+    if missing_columns:
+        raise ValueError(f"Missing columns in raw data: {missing_columns}")
 
 
-def normalize_data(data):
+def normalize_data(**context):
     # Perform any data normalization here
-    global workingData
-    workingData = data.apply(lambda x: x.str.lower() if x.dtype == "object" else x)
-    return SerializableDataFrame(workingData)
+    ti = context['ti']
+    workingData = pd.read_json(ti.xcom_pull(key='working_data'))
+    data = workingData.apply(lambda x: x.str.lower() if x.dtype == "object" else x)
+    ti.xcom_push(key='working_data', value=data.to_json())
 
 
-def clean_data(data):
+def clean_data(**context):
     # Perform any data cleaning here
-    global workingData
-    workingData = data.dropna()
-    return SerializableDataFrame(workingData)
+    ti = context['ti']
+    workingData = pd.read_json(ti.xcom_pull(key='working_data'))
+    data = workingData.dropna()
+    ti.xcom_push(key='working_data', value=data.to_json())
 
 
-def save_data(data):
-    validate_processed_data(data)
-    data.to_csv(PROCESSED_DATA_PATH, index=False)
+def drop_duplicates(**context):
+    """
+    Drop any duplicate rows.
+    """
+    ti = context['ti']
+    workingData = pd.read_json(ti.xcom_pull(key='working_data'))
+    workingData.drop_duplicates(inplace=True)
+    ti.xcom_push(key='working_data', value=workingData.to_json())
+
+
+def save_data(**context):
+    ti = context['ti']
+    workingData = pd.read_json(ti.xcom_pull(key='working_data'))
+    validate_processed_data(workingData)  # pass workingData as an argument
+    workingData.to_csv(PROCESSED_DATA_PATH, index=False)
 
 
 def validate_processed_data(data):
     # Check that all expected columns are present
     columns = set(data.columns)
+    missing_columns = set()
     if set(EXPECTED_COLUMNS) != columns:
         missing_columns = set(EXPECTED_COLUMNS) - columns
         extra_columns = columns - set(EXPECTED_COLUMNS)
@@ -124,72 +139,48 @@ def validate_processed_data(data):
     logging.info("Processed dataset validation successful.")
 
 
-def validate_raw_data(data):
-    """
-    Check that the raw data contains all expected columns.
-    """
-    missing_columns = set(EXPECTED_COLUMNS) - set(data.columns)
-    if missing_columns:
-        raise ValueError(f"Missing columns in raw data: {missing_columns}")
-
-
-def drop_duplicates(data):
-    """
-    Drop any duplicate rows.
-    """
-    global workingData
-    workingData = data.drop_duplicates(inplace=True)
-    return SerializableDataFrame(workingData)
-
-
 # Define the tasks.
 task1 = PythonOperator(
     task_id='retrieve_data',
     python_callable=retrieve_data,
+    provide_context=True,
     dag=dag,
 )
 
 task2 = PythonOperator(
     task_id='validate_raw_data',
     python_callable=validate_raw_data,
-    op_kwargs={'data': workingData},
+    provide_context=True,
     dag=dag,
 )
 
 task3 = PythonOperator(
     task_id='normalize_data',
     python_callable=normalize_data,
-    op_kwargs={'data': workingData},
+    provide_context=True,
     dag=dag,
 )
 
 task4 = PythonOperator(
     task_id='clean_data',
     python_callable=clean_data,
-    op_kwargs={'data': workingData},
+    provide_context=True,
     dag=dag,
 )
 
 task5 = PythonOperator(
     task_id='drop_duplicates',
     python_callable=drop_duplicates,
-    op_kwargs={'data': workingData},
+    provide_context=True,
     dag=dag,
 )
 
 task6 = PythonOperator(
-    task_id='validate_processed_data',
-    python_callable=validate_processed_data,
-    op_kwargs={'data': workingData},
-    dag=dag,
-)
-
-task7 = PythonOperator(
     task_id='save_data',
     python_callable=save_data,
-    op_kwargs={'data': workingData},
+    provide_context=True,
     dag=dag,
 )
 
 # Define the dependencies.
-task1 >> task2 >> task3 >> task4 >> task5 >> task6 >> task7
+task1 >> task2 >> task3 >> task4 >> task5 >> task6
