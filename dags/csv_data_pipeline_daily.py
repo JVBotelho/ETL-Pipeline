@@ -4,6 +4,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 import logging
 import os
+import attr
 
 # Define the path to the raw and processed datasets.
 AIRFLOW_HOME = os.getenv('AIRFLOW_HOME')
@@ -15,6 +16,22 @@ EXPECTED_COLUMNS = ['uniq_id', 'crawl_timestamp', 'product_url', 'product_name',
                     'retail_price', 'discounted_price', 'image', 'is_FK_Advantage_product', 'description',
                     'product_rating', 'overall_rating', 'brand', 'product_specifications']
 
+# Define the global variable to store the retrieved data
+workingData = None
+
+
+def on_failure_callback(context):
+    """
+    A function to handle errors in the DAG.
+    """
+    dag_id = context['dag'].dag_id
+    task_id = context['task_instance'].task_id
+    error_message = context['exception'].getTraceback()
+
+    # Log the error message to the DAG audit log.
+    logging.error(f"DAG {dag_id}, task {task_id}: {error_message}")
+
+
 # Define the default arguments for the DAG.
 default_args = {
     'owner': 'airflow',
@@ -24,6 +41,7 @@ default_args = {
     'email_on_retry': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
+    'on_failure_callback': on_failure_callback,
 }
 
 # Create the DAG object.
@@ -37,22 +55,34 @@ dag = DAG(
 
 
 # Define the functions to retrieve,normalize, and clean the data.
+@attr.s
+class SerializableDataFrame:
+    data = attr.ib()
+
 def retrieve_data():
-    data = pd.read_csv(RAW_DATA_PATH)
-    print(data)
-    return data
+    global workingData
+    try:
+        workingData = pd.read_csv(RAW_DATA_PATH)
+        logging.info('Data retrieved successfully.')
+    except Exception as e:
+        logging.error(f'Error retrieving data: {str(e)}')
+        raise e
+
+    return SerializableDataFrame(workingData)
 
 
 def normalize_data(data):
     # Perform any data normalization here
-    normalized_data = data.apply(lambda x: x.str.lower() if x.dtype == "object" else x)
-    return normalized_data
+    global workingData
+    workingData = data.apply(lambda x: x.str.lower() if x.dtype == "object" else x)
+    return SerializableDataFrame(workingData)
 
 
 def clean_data(data):
     # Perform any data cleaning here
-    cleaned_data = data.dropna()
-    return cleaned_data
+    global workingData
+    workingData = data.dropna()
+    return SerializableDataFrame(workingData)
 
 
 def save_data(data):
@@ -107,8 +137,9 @@ def drop_duplicates(data):
     """
     Drop any duplicate rows.
     """
-    data.drop_duplicates(inplace=True)
-    return data
+    global workingData
+    workingData = data.drop_duplicates(inplace=True)
+    return SerializableDataFrame(workingData)
 
 
 # Define the tasks.
@@ -120,43 +151,43 @@ task1 = PythonOperator(
 
 task2 = PythonOperator(
     task_id='validate_raw_data',
-    python_callable= validate_raw_data,
-    op_kwargs={'data': retrieve_data()},
+    python_callable=validate_raw_data,
+    op_kwargs={'data': workingData},
     dag=dag,
 )
 
 task3 = PythonOperator(
     task_id='normalize_data',
     python_callable=normalize_data,
-    op_kwargs={'data': retrieve_data()},
+    op_kwargs={'data': workingData},
     dag=dag,
 )
 
 task4 = PythonOperator(
     task_id='clean_data',
     python_callable=clean_data,
-    op_kwargs={'data': normalize_data(retrieve_data())},
+    op_kwargs={'data': workingData},
     dag=dag,
 )
 
 task5 = PythonOperator(
     task_id='drop_duplicates',
     python_callable=drop_duplicates,
-    op_kwargs={'data': clean_data(retrieve_data())},
+    op_kwargs={'data': workingData},
     dag=dag,
 )
 
 task6 = PythonOperator(
     task_id='validate_processed_data',
     python_callable=validate_processed_data,
-    op_kwargs={'data': clean_data(retrieve_data())},
+    op_kwargs={'data': workingData},
     dag=dag,
 )
 
 task7 = PythonOperator(
     task_id='save_data',
     python_callable=save_data,
-    op_kwargs={'data': clean_data(retrieve_data())},
+    op_kwargs={'data': workingData},
     dag=dag,
 )
 
