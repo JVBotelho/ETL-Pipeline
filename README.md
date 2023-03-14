@@ -12,6 +12,10 @@ The pipeline is designed to run on a daily basis to ensure that the processed da
 
 Refer to the Roadmap section for more details about upcoming improvements and features.
 
+## Tech Stack
+
+- Apache Airflow
+- Python
 ## Install
 
 - Get Docker for your OS [Here](https://docs.docker.com/get-docker/)
@@ -56,7 +60,6 @@ Refer to the Roadmap section for more details about upcoming improvements and fe
 - Validate the raw data based in the PostgreSQL table columns
 - Create empty dag schema to be used as model for new dags
 - Improve error handling
-- Improve performance
 
 ## Autor
 
