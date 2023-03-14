@@ -1,7 +1,16 @@
 
 # ETL-Pipeline
 
+This is a Python ETL pipeline designed to ingest data on a daily basis while ensuring data consistency, quality, and integrity before saving the treated data. The pipeline is responsible for:
 
+- Retrieving data from a CSV dataset
+- Normalizing and cleaning the data
+- Dropping any duplicate rows
+- Validating the processed data to ensure that it meets the expected criteria
+- Saving the processed data to a new CSV dataset
+The pipeline is designed to run on a daily basis to ensure that the processed dataset is up-to-date. The pipeline also includes a failure handling mechanism to help detect and resolve errors quickly.
+
+Refer to the Roadmap section for more details about upcoming improvements and features.
 
 ## Install
 
@@ -45,7 +54,8 @@
 - Fully change to the TaskFlow API paradigm
 - Save to the PostgreSQL instead of a new .csv dataset
 - Validate the raw data based in the PostgreSQL table columns
-
+- Create empty dag schema to be used as model for new dags
+- Improve error handling
 
 ## Autor
 
