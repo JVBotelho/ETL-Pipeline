@@ -3,10 +3,12 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 import logging
+import os
 
 # Define the path to the raw and processed datasets.
-RAW_DATA_PATH = "../Datasets/raw/flipkart_com-ecommerce_sample.csv"
-PROCESSED_DATA_PATH = "../Datasets/processed/processed_dataset.csv"
+AIRFLOW_HOME = os.getenv('AIRFLOW_HOME')
+RAW_DATA_PATH = AIRFLOW_HOME + "/dags/rawData.csv"
+PROCESSED_DATA_PATH = AIRFLOW_HOME + "/dags/processedDataset.csv"
 
 # Define the expected columns.
 EXPECTED_COLUMNS = ['uniq_id', 'crawl_timestamp', 'product_url', 'product_name', 'product_category_tree', 'pid',
@@ -37,6 +39,7 @@ dag = DAG(
 # Define the functions to retrieve,normalize, and clean the data.
 def retrieve_data():
     data = pd.read_csv(RAW_DATA_PATH)
+    print(data)
     return data
 
 
@@ -117,7 +120,7 @@ task1 = PythonOperator(
 
 task2 = PythonOperator(
     task_id='validate_raw_data',
-    python_callable=validate_raw_data,
+    python_callable= validate_raw_data,
     op_kwargs={'data': retrieve_data()},
     dag=dag,
 )
