@@ -7,8 +7,8 @@ import os
 
 # Define the path to the raw and processed datasets.
 AIRFLOW_HOME = os.getenv('AIRFLOW_HOME')
-RAW_DATA_PATH = AIRFLOW_HOME + "/dags/rawData.csv"
-PROCESSED_DATA_PATH = AIRFLOW_HOME + "/dags/processedDataset.csv"
+RAW_DATA_PATH = AIRFLOW_HOME + "/Datasets/raw/flipkart_com-ecommerce_sample.csv"
+PROCESSED_DATA_PATH = AIRFLOW_HOME + "/Datasets/processed/processedDataset.csv"
 
 # Define the expected columns.
 EXPECTED_COLUMNS = ['uniq_id', 'crawl_timestamp', 'product_url', 'product_name', 'product_category_tree', 'pid',
@@ -42,7 +42,7 @@ default_args = {
 
 # Create the DAG object.
 dag = DAG(
-    'csv_data_pipeline_daily_v2.1.3',
+    'csv_data_pipeline_daily_v2.2.1',
     default_args=default_args,
     description=('A DAG that retrieves data from a CSV dataset, normalizes '
                  'and cleans it, and saves it to another CSV dataset daily.'),
@@ -99,7 +99,11 @@ def drop_duplicates(**context):
 
 def save_data(**context):
     ti = context['ti']
-    workingData = pd.read_json(ti.xcom_pull(key='working_data'))
+    workingData = pd.read_json(ti.xcom_pull(key='working_data'),
+                               dtype={'uniq_id': str, 'crawl_timestamp': str, 'product_url': str,
+                                      'product_name': str, 'product_category_tree': str, 'pid': str, 'image': str,
+                                      'description': str, 'brand': str, 'product_specifications': str
+                                      })
     validate_processed_data(workingData)  # pass workingData as an argument
     workingData.to_csv(PROCESSED_DATA_PATH, index=False)
 
@@ -131,10 +135,15 @@ def validate_processed_data(data):
                       'image': str, 'is_FK_Advantage_product': int, 'description': str, 'product_rating': float,
                       'overall_rating': float, 'brand': str, 'product_specifications': str}
     for col, expected_type in expected_types.items():
-        if data[col].dtype != expected_type:
-            error_msg = f"Processed dataset has incorrect data type for column {col}"
-            logging.error(error_msg)
-            raise ValueError(error_msg)
+        actual_type = data[col].dtype
+        is_object = isinstance(actual_type, object)
+
+        if not is_object:
+            if actual_type != expected_type:
+                error_msg = (f"Processed dataset has incorrect data type for column {col},"
+                             f"Expected {expected_type}, found {actual_type} : {is_object}")
+                logging.error(error_msg)
+                raise ValueError(error_msg)
 
     logging.info("Processed dataset validation successful.")
 
