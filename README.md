@@ -60,6 +60,8 @@ Refer to the Roadmap section for more details about upcoming improvements and fe
 - Validate the raw data based in the PostgreSQL table columns
 - Create empty dag schema to be used as model for new dags
 - Improve error handling
+- Improve DataType validation
+- Improve performance
 
 ## Autor
 
