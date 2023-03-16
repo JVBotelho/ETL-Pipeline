@@ -12,6 +12,28 @@ The pipeline is designed to run on a daily basis to ensure that the processed da
 
 Refer to the Roadmap section for more details about upcoming improvements and features.
 
+## Solution Explain
+
+This DAG retrieves data from a CSV dataset, normalizes and cleans it, and saves it to another CSV dataset daily. It consists of six tasks, each performing a specific data processing task. The DAG runs daily and is triggered by a schedule interval of timedelta(days=1).
+
+The retrieve_data task reads the raw dataset from a specified file path and pushes the data to the next task. The validate_raw_data task checks if the raw dataset contains all expected columns, and raises a ValueError if any column is missing. The normalize_data task performs data normalization by converting all object-type columns to lowercase. The clean_data task drops any rows with null values. The drop_duplicates task removes any duplicate rows in the data. The save_data task writes the processed data to a specified file path.
+
+The DAG also includes functions to handle errors and validate the processed dataset for expected columns, null values, and data types. If any errors occur, the on_failure_callback function logs the error message to the DAG audit log.
+
+In addition, this DAG explicitly sets the data type of certain columns in the processed dataset, which helps ensure data consistency and avoids data type mismatches.
+
+## Balancing Feature dev and tech debt
+
+When working on an artifact that has been around for a while and is showing signs of decreasing performance, it's important to balance feature development with technical debt. This is especially important when working as part of a team, as different team members may have different priorities.
+
+One way to balance feature development and technical debt is to prioritize the most critical issues that are impacting the performance of the artifact. This could involve identifying and addressing bottlenecks, improving data quality, or refactoring code to make it more efficient. It's important to involve the whole team in this process, as different team members may have different perspectives and insights into the performance issues.
+
+Another approach is to prioritize technical debt over new features for a period of time in order to make the necessary improvements to the artifact. This may involve dedicating a sprint or two to addressing technical debt, rather than focusing on new feature development.
+
+It's also important to continuously monitor and measure the performance of the artifact in order to identify any emerging issues and to ensure that the technical debt is not accumulating at an unsustainable rate.
+
+Ultimately, balancing feature development and technical debt is a collaborative process that requires open communication, careful planning, and a willingness to prioritize performance and stability over new features when necessary.
+
 ## Tech Stack
 
 - Apache Airflow
