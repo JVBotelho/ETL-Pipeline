@@ -11,7 +11,6 @@ This is a Python ETL pipeline designed to ingest data on a daily basis while ens
 The pipeline is designed to run on a daily basis to ensure that the processed dataset is up-to-date. The pipeline also includes a failure handling mechanism to help detect and resolve errors quickly.
 
 Refer to the Roadmap section for more details about upcoming improvements and features.
-
 ## Solution Explain
 
 This DAG retrieves data from a CSV dataset, normalizes and cleans it, and saves it to another CSV dataset daily. It consists of six tasks, each performing a specific data processing task. The DAG runs daily and is triggered by a schedule interval of timedelta(days=1).
@@ -83,7 +82,7 @@ Ultimately, balancing feature development and technical debt is a collaborative 
 - Create empty dag schema to be used as model for new dags
 - Improve error handling
 - Improve DataType validation
-- Improve performance
+- Improve performance (Maybe add ApacheSpark)
 
 ## Autor
 
